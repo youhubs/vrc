@@ -16,13 +16,10 @@ pros::Motor lb(-1);
 
 pros::Optical ring(10);
 
-pros::Rotation horizontalRot(9); // Replace 9 with the actual port
+// Add inertial sensor(imu) and ration sensor
+pros::Imu imu(9);
+pros::Rotation horizontalRot(5);
 
-/*
-const int numStates = 3;
-int states[numStates] = {0, 300, 2000};
-int
-*/
 
 const int numStates = 3;
 // Target positions in motor encoder ticks (assuming 1 degree = 5 ticks; adjust as needed)
@@ -38,7 +35,6 @@ void nextState() {
     }
     target = states[currState];
 }
-
 
 void liftControl() {
     double kp = 0.5;
@@ -75,13 +71,10 @@ lemlib:: Drivetrain drivetrain(
     2
 );
 
-// initialization of inertial sensor(imu)
-pros::Imu imu(12);
-
 lemlib::TrackingWheel horizontalWheel(
     &horizontalRot, 
-    2.75,    // Wheel diameter (inches)
-    -3.25,   // Distance from center (negative = left side, positive = right)
+    2,       // Wheel diameter (inches)
+    -3.25,   // Distance from center (negative=left side, positive=right)
     1.0      // Gear ratio (1:1 if directly connected)
 );
 
@@ -143,8 +136,8 @@ lemlib::Chassis chassis(drivetrain,
 
 void initialize() {
     pros::lcd::initialize(); // initialize brain screen
-    horizontalRot.reset(); // Reset horizontal tracking wheel
-    chassis.calibrate(); // calibrate sensors
+    horizontalRot.reset();   // Reset horizontal tracking wheel
+    chassis.calibrate();     // calibrate sensors
     chassis.setPose(0, 1, 0);
     lb.tare_position();
     
@@ -161,7 +154,7 @@ void initialize() {
             pros::lcd::print(5, "imu: %f", rgb_value.blue); 
 
             double horizontalDisplacement = horizontalRot.get_position();
-            pros::lcd::print(3, "Horizontal: %f", horizontalDisplacement);
+            pros::lcd::print(6, "Horizontal: %f", horizontalDisplacement);
 
             // heading
             // delay to save resources
