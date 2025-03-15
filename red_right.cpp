@@ -9,22 +9,17 @@
 #include <cstdlib>
 
 
-
 pros::MotorGroup left_motors({10, -7, -5}, pros::MotorGear::blue);
 pros::MotorGroup right_motors({-9, 1, 6}, pros::MotorGear::blue);
 pros::Motor preRoller(-3);
 pros::Motor conv(4, pros::MotorGear::blue, pros::MotorUnits::counts);
 pros::Motor lb(-8);
 
-
-
 pros::Optical ring(11);
 
-/*
-const int numStates = 3;
-int states[numStates] = {0, 300, 2000};
-int
-*/
+// Add inertial sensor(imu) and ration sensor
+pros::Imu imu(9);
+pros::Rotation horizontalRot(5);
 
 const int numStates = 3;
 // Target positions in motor encoder ticks (assuming 1 degree = 5 ticks; adjust as needed)
@@ -50,13 +45,9 @@ void liftControl() {
     if (std::abs(error) < 2) { // Deadband for small errors (adjust if needed)
         velocity = 0;
     }
-    
 
     lb.move(velocity);
 }
-
-
-
 
 
 pros::adi::DigitalOut mogo('A');
@@ -64,17 +55,12 @@ pros::adi::DigitalOut leftDoinker('B');
 pros::adi::DigitalOut rightDoinker('H');
 
 bool mToggle = false;
-
 bool mLatch = false;
 // Toggle and Latch for Corner Clear
 bool cLatch = false;
-
 bool cToggle = false;
-
 bool dLatch = false;
-
 bool dToggle = false;
-
 
 
 lemlib:: Drivetrain drivetrain(
@@ -86,17 +72,18 @@ lemlib:: Drivetrain drivetrain(
     2
 );
 
-
-// initialization of inertial sensor(imu)
-pros::Imu imu(12);
-
-
+lemlib::TrackingWheel horizontalWheel(
+    &horizontalRot, 
+    2,    // Wheel diameter (inches)
+    -0.25,     // Distance from center (negative = left side, positive = right)
+    1.0       // Gear ratio (1:1 if directly connected)
+);
 
 // stating the odom
 lemlib::OdomSensors sensors (
     nullptr, //&vertical_tracking_wheel,
     nullptr,
-    nullptr, //&horizontal_tracking_wheel,
+    &horizontalWheel, //&horizontal_tracking_wheel,
     nullptr,
     &imu
 );
@@ -152,6 +139,7 @@ lemlib::Chassis chassis(drivetrain,
 
 void initialize() {
     pros::lcd::initialize(); // initialize brain screen
+    horizontalRot.reset(); // Reset horizontal tracking wheel
     chassis.calibrate(); // calibrate sensors
     chassis.setPose(0, 1, 0);
     lb.tare_position();
@@ -167,7 +155,10 @@ void initialize() {
             pros::lcd::print(3, "imu: %f", rgb_value.red);        
             pros::lcd::print(4, "imu: %f", rgb_value.green);        
             pros::lcd::print(5, "imu: %f", rgb_value.blue); 
-            // heading
+
+            double horizontalDisplacement = horizontalRot.get_position();
+            pros::lcd::print(3, "Horizontal: %f", horizontalDisplacement);
+            
             // delay to save resources
             pros::delay(20);
         }
@@ -181,8 +172,7 @@ void initialize() {
             pros::delay(10);
         }
     });
-   
-    
+
 }
 
 void moveConveyerTask() {
@@ -201,18 +191,13 @@ void moveConveyerTask() {
 
 // Start this task in `autonomous()`
 
-
-
-
 void disabled() {}
 void competition_initialize() {}
 
 void autonomous() {
     chassis.setBrakeMode(pros::E_MOTOR_BRAKE_HOLD);
-    
     lb.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
     /*
-    
     chassis.moveToPose(24,24,90, 2000,{.maxSpeed = 127});
     chassis.turnToHeading(180,2000);
     chassis.moveToPose(0,0,270, 2000);
@@ -221,10 +206,7 @@ void autonomous() {
     // chassis.turnToHeading(90,1000);
     */
 
-    
     pros::Task conveyorTask(moveConveyerTask);
-   
-   
 
     nextState(); 
     nextState();
@@ -251,49 +233,31 @@ void autonomous() {
     leftDoinker.set_value(false);
     rightDoinker.set_value(false);
     //chassis.moveToPoint(,-34,2000);s
-    
-    
 
-
-    
     conv.move(127);
     preRoller.move(127);
     chassis.swingToHeading(20, lemlib::DriveSide::LEFT, 900, {.maxSpeed = 90});
     pros::delay(200);
     chassis.swingToHeading(165, lemlib::DriveSide::RIGHT, 1200, {.maxSpeed = 80});
     chassis.moveToPose(32, -66, 135, 1000);
-    
-    
-    
 
 }
 
 
 void opcontrol() {
     pros::Controller master(pros::E_CONTROLLER_MASTER);
-
     chassis.setBrakeMode(pros::E_MOTOR_BRAKE_HOLD);
-
     preRoller.set_brake_mode(pros::MotorBrake::coast);
 
-
-
-
-    
-    
  while (true) {
     //pros::Task conveyorTask(moveConveyerTask);
-   
     int left = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
     int right = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y);
-    
-
 
     left_motors.move(left);
     right_motors.move(right);
     
         // Tank drive control
-    
         pros::c::optical_rgb_s_t rgb_value;
         rgb_value = ring.get_rgb();
         
@@ -328,7 +292,6 @@ void opcontrol() {
                 conv.move(0);
             }
         }
-
 
         mogo.set_value(mToggle);
 
