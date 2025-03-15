@@ -16,6 +16,8 @@ pros::Motor lb(-1);
 
 pros::Optical ring(10);
 
+pros::Rotation horizontalRot(9); // Replace 9 with the actual port
+
 /*
 const int numStates = 3;
 int states[numStates] = {0, 300, 2000};
@@ -76,11 +78,18 @@ lemlib:: Drivetrain drivetrain(
 // initialization of inertial sensor(imu)
 pros::Imu imu(12);
 
+lemlib::TrackingWheel horizontalWheel(
+    &horizontalRot, 
+    2.75,    // Wheel diameter (inches)
+    -3.25,   // Distance from center (negative = left side, positive = right)
+    1.0      // Gear ratio (1:1 if directly connected)
+);
+
 // stating the odom
 lemlib::OdomSensors sensors (
     nullptr, //&vertical_tracking_wheel,
     nullptr,
-    nullptr, //&horizontal_tracking_wheel,
+    &horizontalWheel, //&horizontal_tracking_wheel,
     nullptr,
     &imu
 );
@@ -134,6 +143,7 @@ lemlib::Chassis chassis(drivetrain,
 
 void initialize() {
     pros::lcd::initialize(); // initialize brain screen
+    horizontalRot.reset(); // Reset horizontal tracking wheel
     chassis.calibrate(); // calibrate sensors
     chassis.setPose(0, 1, 0);
     lb.tare_position();
@@ -149,6 +159,10 @@ void initialize() {
             pros::lcd::print(3, "imu: %f", rgb_value.red);        
             pros::lcd::print(4, "imu: %f", rgb_value.green);        
             pros::lcd::print(5, "imu: %f", rgb_value.blue); 
+
+            double horizontalDisplacement = horizontalRot.get_position();
+            pros::lcd::print(3, "Horizontal: %f", horizontalDisplacement);
+
             // heading
             // delay to save resources
             pros::delay(20);
