@@ -7,22 +7,17 @@
 #include <cstdlib>
 
 
-
 pros::MotorGroup left_motors({10, -7, -5}, pros::MotorGear::blue);
 pros::MotorGroup right_motors({-9, 1, 6}, pros::MotorGear::blue);
 pros::Motor preRoller(-3);
 pros::Motor conv(4, pros::MotorGear::blue, pros::MotorUnits::counts);
 pros::Motor lb(-8);
 
-
-
 pros::Optical ring(11);
 
-/*
-const int numStates = 3;
-int states[numStates] = {0, 300, 2000};
-int
-*/
+// Add inertial sensor(imu) and ration sensor
+pros::Imu imu(9);
+pros::Rotation horizontalRot(5);
 
 const int numStates = 3;
 // Target positions in motor encoder ticks (assuming 1 degree = 5 ticks; adjust as needed)
@@ -47,7 +42,6 @@ void liftControl() {
     if (std::abs(error) < 2) { // Deadband for small errors (adjust if needed)
         velocity = 0;
     }
-    
 
     lb.move(velocity);
 }
@@ -70,8 +64,6 @@ bool dLatch = false;
 bool dToggle = false;
 
 
-
-
 lemlib:: Drivetrain drivetrain(
     &left_motors,
     &right_motors,
@@ -81,17 +73,18 @@ lemlib:: Drivetrain drivetrain(
     2
 );
 
-
-// initialization of inertial sensor(imu)
-pros::Imu imu(12);
-
-
+lemlib::TrackingWheel horizontalWheel(
+    &horizontalRot, 
+    2,    // Wheel diameter (inches)
+    -0.25,     // Distance from center (negative = left side, positive = right)
+    1.0       // Gear ratio (1:1 if directly connected)
+);
 
 // stating the odom
 lemlib::OdomSensors sensors (
     nullptr, //&vertical_tracking_wheel,
     nullptr,
-    nullptr, //&horizontal_tracking_wheel,
+    &horizontalWheel, //&horizontal_tracking_wheel,
     nullptr,
     &imu
 );
@@ -143,11 +136,10 @@ lemlib::Chassis chassis(drivetrain,
 );
 
 
-
-
 void initialize() {
     pros::lcd::initialize(); // initialize brain screen
-    chassis.calibrate(); // calibrate sensors
+    horizontalRot.reset();   // Reset horizontal tracking wheel
+    chassis.calibrate();     // calibrate sensors
     chassis.setPose(0, 1, 0);
     lb.tare_position();
     pros::Task screen_task([&]() {
@@ -156,6 +148,10 @@ void initialize() {
             pros::lcd::print(0, "X: %f", chassis.getPose().x); // x
             pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
             pros::lcd::print(2, "Heading|Theta: %f", chassis.getPose().theta); // heading
+
+            double horizontalDisplacement = horizontalRot.get_position();
+            pros::lcd::print(3, "Horizontal: %f", horizontalDisplacement);
+
             // delay to save resources
             pros::delay(20);
         }
@@ -170,13 +166,11 @@ void initialize() {
             pros::delay(10);
         }
     });
-   
     
 }
 
 void moveConveyerTask() {
     while (true) {
-
         pros::c::optical_rgb_s_t rgb_value = ring.get_rgb();
         if (rgb_value.blue >= rgb_value.red) {
             pros::delay(160);
@@ -206,7 +200,6 @@ void autonomous() {
     // chassis.turnToHeading(90,1000);
     */
 
-    
     //grab mogo
     chassis.moveToPose(0, -32, 0, 1100, {.forwards = false, .maxSpeed = 80});
     pros::delay(875);
@@ -245,7 +238,6 @@ void autonomous() {
 
     */
     
-    
     //chassis.moveToPoint(22, -50, 1500, {.forwards = false, .maxSpeed = 90});
     
 
@@ -273,8 +265,6 @@ void autonomous() {
     
     //chassis.moveToPoint(26, 4, 500, {.forwards = false});
 
-    
-
 
     //chassis.moveToPoint(,-34,2000);
 
@@ -282,7 +272,6 @@ void autonomous() {
     
     //chassis.turnToHeading(-315, 1500);
     //chassis.moveToPoint(0, -33,  2000, {.forwards = true, .maxSpeed = 30 });
-    
 
 }
 
@@ -295,22 +284,14 @@ void opcontrol() {
     preRoller.set_brake_mode(pros::MotorBrake::coast);
 
 
-
-
-    
-    
  while (true) {
-
     int left = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
     int right = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y);
-
-
 
     left_motors.move(left);
     right_motors.move(right);
     
         // Tank drive control
-    
         pros::c::optical_rgb_s_t rgb_value;
         rgb_value = ring.get_rgb();
         
