@@ -6,14 +6,13 @@
 #include "pros/rotation.hpp"
 #include <cstdlib>
 
+pros::MotorGroup left_motors({18, -17, -15}, pros::MotorGear::blue);
+pros::MotorGroup right_motors({-13, 16, 19}, pros::MotorGear::blue);
+pros::Motor preRoller(-12);
+pros::Motor conv(11, pros::MotorGear::blue, pros::MotorUnits::counts);
+pros::Motor lb(-1);
 
-pros::MotorGroup left_motors({10, -7, -5}, pros::MotorGear::blue);
-pros::MotorGroup right_motors({-9, 1, 6}, pros::MotorGear::blue);
-pros::Motor preRoller(-3);
-pros::Motor conv(4, pros::MotorGear::blue, pros::MotorUnits::counts);
-pros::Motor lb(-8);
-
-pros::Optical ring(11);
+pros::Optical ring(10);
 
 // Add inertial sensor(imu) and ration sensor
 pros::Imu imu(9);
@@ -46,23 +45,17 @@ void liftControl() {
     lb.move(velocity);
 }
 
-
-pros::adi::DigitalOut mogo('A');
-pros::adi::DigitalOut leftDoinker('B');
-pros::adi::DigitalOut rightDoinker('H');
+pros::adi::DigitalOut mogo('B');
+pros::adi::DigitalOut leftDoinker('C');
+pros::adi::DigitalOut rightDoinker('A');
 
 bool mToggle = false;
-
 bool mLatch = false;
 // Toggle and Latch for Corner Clear
 bool cLatch = false;
-
 bool cToggle = false;
-
 bool dLatch = false;
-
 bool dToggle = false;
-
 
 lemlib:: Drivetrain drivetrain(
     &left_motors,
@@ -75,9 +68,9 @@ lemlib:: Drivetrain drivetrain(
 
 lemlib::TrackingWheel horizontalWheel(
     &horizontalRot, 
-    2,    // Wheel diameter (inches)
-    -0.25,     // Distance from center (negative = left side, positive = right)
-    1.0       // Gear ratio (1:1 if directly connected)
+    2,   // Wheel diameter (inches)
+    -0.25,    // Distance from center (negative = left side, positive = right)
+    1.0      // Gear ratio (1:1 if directly connected)
 );
 
 // stating the odom
@@ -90,7 +83,7 @@ lemlib::OdomSensors sensors (
 );
 
 // lateral PID controller
-lemlib::ControllerSettings lateral_controller(30   , // proportional gain (kP)
+lemlib::ControllerSettings lateral_controller(30, // proportional gain (kP)
                                             0, // integral gain (kI)
                                             120, // derivative gain (kD)
                                             3, // anti windup
@@ -148,7 +141,6 @@ void initialize() {
             pros::lcd::print(0, "X: %f", chassis.getPose().x); // x
             pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
             pros::lcd::print(2, "Heading|Theta: %f", chassis.getPose().theta); // heading
-
             double horizontalDisplacement = horizontalRot.get_position();
             pros::lcd::print(3, "Horizontal: %f", horizontalDisplacement);
 
@@ -157,8 +149,7 @@ void initialize() {
         }
     });
     
-    //lb.tare_position();
-
+    // lb.tare_position();
     // Create a task to continuously control the lift motor
     pros::Task liftControlTask([] {
         while (true) {
@@ -166,7 +157,6 @@ void initialize() {
             pros::delay(10);
         }
     });
-    
 }
 
 void moveConveyerTask() {
@@ -185,20 +175,19 @@ void moveConveyerTask() {
 void disabled() {}
 void competition_initialize() {}
 
+
 void autonomous() {
     chassis.setBrakeMode(pros::E_MOTOR_BRAKE_HOLD);
-    
     lb.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
-    
-    pros::Task conveyorTask(moveConveyerTask);
-    /*
-    chassis.moveToPose(24,24,90, 2000,{.maxSpeed = 127});
-    chassis.turnToHeading(180,2000);
-    chassis.moveToPose(0,0,270, 2000);
-    chassis.turnToHeading(0,2000);
-    chassis.moveToPose(0,0,0,2000);
+
+    // chassis.moveToPose(24,24,90, 2000,{.maxSpeed = 127});
+    // chassis.turnToHeading(180,2000);
+    // chassis.moveToPose(0,0,270, 2000);
+    // chassis.turnToHeading(0,2000);
+    // chassis.moveToPose(0,0,0,2000);
     // chassis.turnToHeading(90,1000);
-    */
+
+    pros::Task conveyorTask(moveConveyerTask);
 
     //grab mogo
     chassis.moveToPose(0, -32, 0, 1100, {.forwards = false, .maxSpeed = 80});
@@ -239,8 +228,6 @@ void autonomous() {
     */
     
     //chassis.moveToPoint(22, -50, 1500, {.forwards = false, .maxSpeed = 90});
-    
-
     //8.5
     /*pros::delay(100);
     chassis.turnToHeading(45, 700)
@@ -264,37 +251,32 @@ void autonomous() {
     */
     
     //chassis.moveToPoint(26, 4, 500, {.forwards = false});
-
-
     //chassis.moveToPoint(,-34,2000);
 
     pros::delay(200);
-    
     //chassis.turnToHeading(-315, 1500);
     //chassis.moveToPoint(0, -33,  2000, {.forwards = true, .maxSpeed = 30 });
-
 }
 
 
 void opcontrol() {
     pros::Controller master(pros::E_CONTROLLER_MASTER);
-
-    chassis.setBrakeMode(pros::E_MOTOR_BRAKE_HOLD);
-
+    chassis.setBrakeMode(pros::E_MOTOR_BRAKE_COAST);
     preRoller.set_brake_mode(pros::MotorBrake::coast);
 
+    while (true) {
+        int power = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y);
+        int turn = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X);
+        int left = power + turn;
+        int right = power - turn;
 
- while (true) {
-    int left = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
-    int right = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y);
-
-    left_motors.move(left);
-    right_motors.move(right);
-    
+        left_motors.move(left);
+        right_motors.move(right);
+        
         // Tank drive control
         pros::c::optical_rgb_s_t rgb_value;
         rgb_value = ring.get_rgb();
-        
+
         // Intake control
         if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {
             conv.move(200); // Spin intake forward
@@ -325,7 +307,6 @@ void opcontrol() {
             }
         }
 
-
         mogo.set_value(mToggle);
 
         if (master.get_digital(pros::E_CONTROLLER_DIGITAL_X)){
@@ -336,7 +317,6 @@ void opcontrol() {
         } else {
             mLatch = false;
         }
-
         
         leftDoinker.set_value(cToggle);
         if (master.get_digital(pros::E_CONTROLLER_DIGITAL_A)){
@@ -356,14 +336,11 @@ void opcontrol() {
         } else {
             dLatch = false; 
         }
-        
+
         pros::lcd::print(2, "imu: %f", imu.get_heading());        
         pros::lcd::print(3, "imu: %f", rgb_value.red);        
         pros::lcd::print(4, "imu: %f", rgb_value.green);        
-        pros::lcd::print(5, "imu: %f", rgb_value.blue);        
-        
+        pros::lcd::print(5, "imu: %f", rgb_value.blue);                  
         pros::delay(20); // Short delay to prevent CPU overload
     }
-
-
 }

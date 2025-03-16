@@ -8,14 +8,13 @@
 #include "pros/rtos.hpp"
 #include <cstdlib>
 
+pros::MotorGroup left_motors({18, -17, -15}, pros::MotorGear::blue);
+pros::MotorGroup right_motors({-13, 16, 19}, pros::MotorGear::blue);
+pros::Motor preRoller(-12);
+pros::Motor conv(11, pros::MotorGear::blue, pros::MotorUnits::counts);
+pros::Motor lb(-1);
 
-pros::MotorGroup left_motors({10, -7, -5}, pros::MotorGear::blue);
-pros::MotorGroup right_motors({-9, 1, 6}, pros::MotorGear::blue);
-pros::Motor preRoller(-3);
-pros::Motor conv(4, pros::MotorGear::blue, pros::MotorUnits::counts);
-pros::Motor lb(-8);
-
-pros::Optical ring(11);
+pros::Optical ring(10);
 
 // Add inertial sensor(imu) and ration sensor
 pros::Imu imu(9);
@@ -26,7 +25,6 @@ const int numStates = 3;
 int states[numStates] = {0, 230, 1800};
 int currState = 0;
 int target = 0;
-bool moveConv = false;
 
 void nextState() {
     currState += 1;
@@ -49,10 +47,9 @@ void liftControl() {
     lb.move(velocity);
 }
 
-
-pros::adi::DigitalOut mogo('A');
-pros::adi::DigitalOut leftDoinker('B');
-pros::adi::DigitalOut rightDoinker('H');
+pros::adi::DigitalOut mogo('B');
+pros::adi::DigitalOut leftDoinker('C');
+pros::adi::DigitalOut rightDoinker('A');
 
 bool mToggle = false;
 bool mLatch = false;
@@ -61,7 +58,6 @@ bool cLatch = false;
 bool cToggle = false;
 bool dLatch = false;
 bool dToggle = false;
-
 
 lemlib:: Drivetrain drivetrain(
     &left_motors,
@@ -74,9 +70,9 @@ lemlib:: Drivetrain drivetrain(
 
 lemlib::TrackingWheel horizontalWheel(
     &horizontalRot, 
-    2,    // Wheel diameter (inches)
-    -0.25,     // Distance from center (negative = left side, positive = right)
-    1.0       // Gear ratio (1:1 if directly connected)
+    2,   // Wheel diameter (inches)
+    -0.25,    // Distance from center (negative = left side, positive = right)
+    1.0      // Gear ratio (1:1 if directly connected)
 );
 
 // stating the odom
@@ -89,7 +85,7 @@ lemlib::OdomSensors sensors (
 );
 
 // lateral PID controller
-lemlib::ControllerSettings lateral_controller(30   , // proportional gain (kP)
+lemlib::ControllerSettings lateral_controller(30, // proportional gain (kP)
                                             0, // integral gain (kI)
                                             120, // derivative gain (kD)
                                             3, // anti windup
@@ -135,27 +131,18 @@ lemlib::Chassis chassis(drivetrain,
 );
 
 
-
-
 void initialize() {
     pros::lcd::initialize(); // initialize brain screen
-    horizontalRot.reset(); // Reset horizontal tracking wheel
-    chassis.calibrate(); // calibrate sensors
+    horizontalRot.reset();   // Reset horizontal tracking wheel
+    chassis.calibrate();     // calibrate sensors
     chassis.setPose(0, 1, 0);
     lb.tare_position();
-    
-    pros::c::optical_rgb_s_t rgb_value;
-    rgb_value = ring.get_rgb();
     pros::Task screen_task([&]() {
         while (true) {
             // print robot location to the brain screen
             pros::lcd::print(0, "X: %f", chassis.getPose().x); // x
             pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
             pros::lcd::print(2, "Heading|Theta: %f", chassis.getPose().theta); // heading
-            pros::lcd::print(3, "imu: %f", rgb_value.red);        
-            pros::lcd::print(4, "imu: %f", rgb_value.green);        
-            pros::lcd::print(5, "imu: %f", rgb_value.blue); 
-
             double horizontalDisplacement = horizontalRot.get_position();
             pros::lcd::print(3, "Horizontal: %f", horizontalDisplacement);
             
@@ -163,21 +150,19 @@ void initialize() {
             pros::delay(20);
         }
     });
-    
 
-    //lb.tare_position();    // Create a task to continuously control the lift motor
+    // lb.tare_position();    
+    // Create a task to continuously control the lift motor
     pros::Task liftControlTask([] {
         while (true) {
             liftControl();
             pros::delay(10);
         }
     });
-
 }
 
 void moveConveyerTask() {
     while (true) {
-
         pros::c::optical_rgb_s_t rgb_value = ring.get_rgb();
         if (rgb_value.blue >= rgb_value.red) {
             pros::delay(160);
@@ -189,22 +174,20 @@ void moveConveyerTask() {
     }
 }
 
-// Start this task in `autonomous()`
-
 void disabled() {}
 void competition_initialize() {}
+
 
 void autonomous() {
     chassis.setBrakeMode(pros::E_MOTOR_BRAKE_HOLD);
     lb.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
-    /*
-    chassis.moveToPose(24,24,90, 2000,{.maxSpeed = 127});
-    chassis.turnToHeading(180,2000);
-    chassis.moveToPose(0,0,270, 2000);
-    chassis.turnToHeading(0,2000);
-    chassis.moveToPose(0,0,0,2000);
+
+    // chassis.moveToPose(24,24,90, 2000,{.maxSpeed = 127});
+    // chassis.turnToHeading(180,2000);
+    // chassis.moveToPose(0,0,270, 2000);
+    // chassis.turnToHeading(0,2000);
+    // chassis.moveToPose(0,0,0,2000);
     // chassis.turnToHeading(90,1000);
-    */
 
     pros::Task conveyorTask(moveConveyerTask);
 
@@ -240,37 +223,36 @@ void autonomous() {
     pros::delay(200);
     chassis.swingToHeading(165, lemlib::DriveSide::RIGHT, 1200, {.maxSpeed = 80});
     chassis.moveToPose(32, -66, 135, 1000);
-
 }
 
 
 void opcontrol() {
     pros::Controller master(pros::E_CONTROLLER_MASTER);
-    chassis.setBrakeMode(pros::E_MOTOR_BRAKE_HOLD);
+    chassis.setBrakeMode(pros::E_MOTOR_BRAKE_COAST);
     preRoller.set_brake_mode(pros::MotorBrake::coast);
 
- while (true) {
-    //pros::Task conveyorTask(moveConveyerTask);
-    int left = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
-    int right = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y);
+    while (true) {
+        int power = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y);
+        int turn = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X);
+        int left = power + turn;
+        int right = power - turn;
 
-    left_motors.move(left);
-    right_motors.move(right);
-    
+        left_motors.move(left);
+        right_motors.move(right);
+        
         // Tank drive control
         pros::c::optical_rgb_s_t rgb_value;
         rgb_value = ring.get_rgb();
         
         // Intake control
         if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {
-             // Spin intake forward
-             conv.move(127);
-             if (rgb_value.blue >= rgb_value.red) {
+            // Spin intake forward
+            conv.move(127);
+            if (rgb_value.blue >= rgb_value.red) {
                 pros::delay(160);
                 conv.move(0);
                 pros::delay(150);
             }
-             
         } else if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {
             conv.move(-200); // Spin intake backward
         } else {
@@ -303,7 +285,6 @@ void opcontrol() {
         } else {
             mLatch = false;
         }
-
         
         leftDoinker.set_value(cToggle);
         if (master.get_digital(pros::E_CONTROLLER_DIGITAL_A)){
@@ -324,9 +305,10 @@ void opcontrol() {
             dLatch = false; 
         }
         
-        pros::lcd::print(2, "imu: %f", imu.get_heading());        
-        
+        pros::lcd::print(2, "imu: %f", imu.get_heading());
+        pros::lcd::print(3, "imu: %f", rgb_value.red);        
+        pros::lcd::print(4, "imu: %f", rgb_value.green);        
+        pros::lcd::print(5, "imu: %f", rgb_value.blue);    
         pros::delay(20); // Short delay to prevent CPU overload
     }
-
 }
