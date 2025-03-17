@@ -1,10 +1,9 @@
 #include "main.h"
-#include "lemlib/api.hpp"
-#include "lemlib/chassis/chassis.hpp"
-#include "lemlib/chassis/trackingWheel.hpp"
 #include "pros/misc.h"
 #include "pros/motors.h"
 #include "pros/rotation.hpp"
+#include "lemlib/chassis/chassis.hpp"
+#include "lemlib/chassis/trackingWheel.hpp"
 #include "pros/rtos.hpp"
 #include <cstdlib>
 
@@ -38,17 +37,15 @@ void liftControl() {
     double kp = 0.5;
     double error = target - lb.get_position(); // Use motor's internal encoder
     double velocity = kp * error;
-
     // Prevent overshooting or oscillations with clamping
     if (std::abs(error) < 2) { // Deadband for small errors (adjust if needed)
         velocity = 0;
     }
-
     lb.move(velocity);
 }
 
 pros::adi::DigitalOut mogo('B');
-pros::adi::DigitalOut leftDoinker('C');
+pros::adi::DigitalOut leftDoinker('F');
 pros::adi::DigitalOut rightDoinker('A');
 
 bool mToggle = false;
@@ -85,15 +82,15 @@ lemlib::OdomSensors sensors (
 );
 
 // lateral PID controller
-lemlib::ControllerSettings lateral_controller(30, // proportional gain (kP)
-                                            0, // integral gain (kI)
-                                            120, // derivative gain (kD)
-                                            3, // anti windup
-                                            .1, // small error range, in inches
-                                            100, // small error range timeout, in milliseconds
-                                            .5, // large error range, in inches
-                                            500, // large error range timeout, in milliseconds
-                                            30 // maximum acceleration (slew)
+lemlib::ControllerSettings lateral_controller(30,  // proportional gain (kP)
+                                              0,   // integral gain (kI)
+                                              120, // derivative gain (kD)
+                                              3, // anti windup
+                                              .1, // small error range, in inches
+                                              100, // small error range timeout, in milliseconds
+                                              .5, // large error range, in inches
+                                              500, // large error range timeout, in milliseconds
+                                              30 // maximum acceleration (slew)
 );
 
 // angular PID controller
@@ -108,10 +105,9 @@ lemlib::ControllerSettings angular_controller(6, // proportional gain (kP)
                                               0 // maximum acceleration (slew)
 );
 
-
 // input curve for throttle input during driver control
 /*lemlib::ExpoDriveCurve throttle_curve(3, // joystick deadband out of 127
-                                     10, // minimum output where drivetrain will move out of 127
+                                       10, // minimum output where drivetrain will move out of 127
                                      1.019 // expo curve gain
 );
 
@@ -121,6 +117,7 @@ lemlib::ExpoDriveCurve steer_curve(3, // joystick deadband out of 127
                                   1.019 // expo curve gain
 );
 */
+
 // create the chassis
 lemlib::Chassis chassis(drivetrain,
                         lateral_controller,
@@ -137,12 +134,14 @@ void initialize() {
     chassis.calibrate();     // calibrate sensors
     chassis.setPose(0, 1, 0);
     lb.tare_position();
+
     pros::Task screen_task([&]() {
         while (true) {
             // print robot location to the brain screen
             pros::lcd::print(0, "X: %f", chassis.getPose().x); // x
             pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
             pros::lcd::print(2, "Heading|Theta: %f", chassis.getPose().theta); // heading
+            
             double horizontalDisplacement = horizontalRot.get_position();
             pros::lcd::print(3, "Horizontal: %f", horizontalDisplacement);
             
@@ -151,7 +150,7 @@ void initialize() {
         }
     });
 
-    // lb.tare_position();    
+    // lb.tare_position();
     // Create a task to continuously control the lift motor
     pros::Task liftControlTask([] {
         while (true) {
@@ -174,6 +173,20 @@ void moveConveyerTask() {
     }
 }
 
+void correctPosition(double targetX, double targetY, double tolerance = 1.0, int timeout = 1000) {
+    lemlib::Pose pose = chassis.getPose();
+    if (std::abs(pose.x - targetX) > tolerance || std::abs(pose.y - targetY) > tolerance) {
+        chassis.moveToPoint(targetX, targetY, timeout); // Re-adjust
+    }
+}
+
+void correctHeading(double targetTheta, double angleTolerance = 2.0, int timeout = 500) {
+    lemlib::Pose pose = chassis.getPose();
+    if (std::abs(pose.theta - targetTheta) > angleTolerance) {
+        chassis.turnToHeading(targetTheta, timeout);
+    }
+}
+
 void disabled() {}
 void competition_initialize() {}
 
@@ -182,12 +195,11 @@ void autonomous() {
     chassis.setBrakeMode(pros::E_MOTOR_BRAKE_HOLD);
     lb.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
 
-    // chassis.moveToPose(24,24,90, 2000,{.maxSpeed = 127});
+    // chassis.moveToPose(24,24,90,2000,{.maxSpeed=127});
     // chassis.turnToHeading(180,2000);
-    // chassis.moveToPose(0,0,270, 2000);
+    // chassis.moveToPose(0,0,270,2000);
     // chassis.turnToHeading(0,2000);
     // chassis.moveToPose(0,0,0,2000);
-    // chassis.turnToHeading(90,1000);
 
     pros::Task conveyorTask(moveConveyerTask);
 
@@ -201,11 +213,13 @@ void autonomous() {
     chassis.moveToPoint(35, -21.5, 1500, {.forwards = false, .maxSpeed = 75});
     pros::delay(1100);
     mogo.set_value(true);
+    
     chassis.turnToHeading(-305, 1000);
     chassis.moveToPoint(43, -13, 5000, {.maxSpeed = 80});
     pros::delay(1050);
     rightDoinker.set_value(true);
     pros::delay(200);
+
     //chassis.turnToHeading(45, 500);
     chassis.swingToHeading(78, lemlib::DriveSide::RIGHT, 1000, {.maxSpeed =70});
     pros::delay(800);
@@ -215,7 +229,7 @@ void autonomous() {
     pros::delay(1750);
     leftDoinker.set_value(false);
     rightDoinker.set_value(false);
-    //chassis.moveToPoint(,-34,2000);s
+    //chassis.moveToPoint(,-34,2000);
 
     conv.move(127);
     preRoller.move(127);
