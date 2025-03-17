@@ -18,6 +18,12 @@ pros::Optical ring(10);
 pros::Imu imu(9);
 pros::Rotation horizontalRot(5);
 
+double getTrackingWheelDistance() {
+    double wheelDiameter = 2.0;
+    double rotations = horizontalRot.get_position() / 360.0;
+    return rotations * wheelDiameter * M_PI; // Convert to inches
+}
+
 const int numStates = 3;
 // Target positions in motor encoder ticks (assuming 1 degree = 5 ticks; adjust as needed)
 int states[numStates] = {0, 230, 1800};
@@ -142,8 +148,8 @@ void initialize() {
             pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
             pros::lcd::print(2, "Heading|Theta: %f", chassis.getPose().theta); // heading
             
-            double horizontalDisplacement = horizontalRot.get_position();
-            pros::lcd::print(3, "Horizontal: %f", horizontalDisplacement);
+            double distance = getTrackingWheelDistance();
+            pros::lcd::print(3, "Tracking Wheel Distance: %f inches", distance);
 
             // delay to save resources
             pros::delay(20);
