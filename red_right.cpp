@@ -19,6 +19,12 @@ pros::Optical ring(10);
 pros::Imu imu(9);
 pros::Rotation horizontalRot(5);
 
+double getTrackingWheelDistance() {
+    double wheelDiameter = 2.0;
+    double rotations = horizontalRot.get_position() / 360.0;
+    return rotations * wheelDiameter * M_PI; // Convert to inches
+}
+
 const int numStates = 3;
 // Target positions in motor encoder ticks (assuming 1 degree = 5 ticks; adjust as needed)
 int states[numStates] = {0, 230, 1800};
@@ -142,15 +148,14 @@ void initialize() {
             pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
             pros::lcd::print(2, "Heading|Theta: %f", chassis.getPose().theta); // heading
             
-            double horizontalDisplacement = horizontalRot.get_position();
-            pros::lcd::print(3, "Horizontal: %f", horizontalDisplacement);
-            
+            double distance = getTrackingWheelDistance();
+            pros::lcd::print(3, "Tracking Wheel Distance: %f inches", distance);
+
             // delay to save resources
             pros::delay(20);
         }
     });
 
-    // lb.tare_position();
     // Create a task to continuously control the lift motor
     pros::Task liftControlTask([] {
         while (true) {
@@ -203,10 +208,13 @@ void autonomous() {
 
     pros::Task conveyorTask(moveConveyerTask);
 
+    //put on the loaded ring
     nextState(); 
     nextState();
     pros::delay(600);
     nextState();
+
+    //pick up the mobil goal
     chassis.moveToPoint(0, -37, 1750, {.forwards = false, .maxSpeed = 85});
     pros::delay(150);
     chassis.turnToHeading(-90, 800);
@@ -214,13 +222,15 @@ void autonomous() {
     pros::delay(1100);
     mogo.set_value(true);
     
+    //pick up the first middle ring
     chassis.turnToHeading(-305, 1000);
-    chassis.moveToPoint(43, -13, 5000, {.maxSpeed = 80});
-    pros::delay(1050);
+    chassis.moveToPoint(43, -13, 1000, {.maxSpeed = 80});
+    correctHeading(-305);
+    pros::delay(800);
     rightDoinker.set_value(true);
-    pros::delay(200);
+    pros::delay(300);
 
-    //chassis.turnToHeading(45, 500);
+    //pick up the second middle ring
     chassis.swingToHeading(78, lemlib::DriveSide::RIGHT, 1000, {.maxSpeed =70});
     pros::delay(800);
     leftDoinker.set_value(true);
@@ -229,8 +239,8 @@ void autonomous() {
     pros::delay(1750);
     leftDoinker.set_value(false);
     rightDoinker.set_value(false);
-    //chassis.moveToPoint(,-34,2000);
 
+    //chassis.moveToPoint(,-34,2000);
     conv.move(127);
     preRoller.move(127);
     chassis.swingToHeading(20, lemlib::DriveSide::LEFT, 900, {.maxSpeed = 90});

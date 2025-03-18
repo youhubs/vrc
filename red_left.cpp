@@ -156,7 +156,6 @@ void initialize() {
         }
     });
     
-    // lb.tare_position();
     // Create a task to continuously control the lift motor
     pros::Task liftControlTask([] {
         while (true) {
