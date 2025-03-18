@@ -215,38 +215,46 @@ void autonomous() {
     nextState();
 
     //pick up the mobil goal
-    chassis.moveToPoint(0, -37, 1750, {.forwards = false, .maxSpeed = 85});
-    pros::delay(150);
+    chassis.moveToPoint(0, -37, 1750, {.forwards = false, .maxSpeed = 92});
+    conv.move(0);
+    pros::delay(100);
     chassis.turnToHeading(-90, 800);
-    chassis.moveToPoint(35, -21.5, 1500, {.forwards = false, .maxSpeed = 75});
-    pros::delay(1100);
+    chassis.moveToPoint(35, -21.5, 1500, {.forwards = false, .maxSpeed = 90});
+    pros::delay(1105);
+    conv.move(0);
     mogo.set_value(true);
     
     //pick up the first middle ring
     chassis.turnToHeading(-305, 1000);
-    chassis.moveToPoint(43, -13, 1000, {.maxSpeed = 80});
-    correctHeading(-305);
-    pros::delay(800);
+    chassis.moveToPoint(43, -12, 1000, {.maxSpeed = 92});
+    correctHeading(-306);
     rightDoinker.set_value(true);
     pros::delay(300);
 
     //pick up the second middle ring
-    chassis.swingToHeading(78, lemlib::DriveSide::RIGHT, 1000, {.maxSpeed =70});
-    pros::delay(800);
+    chassis.swingToHeading(78, lemlib::DriveSide::RIGHT, 1000, {.maxSpeed =95});
+    pros::delay(600);
     leftDoinker.set_value(true);
     pros::delay(300);
-    chassis.moveToPoint(-4, -39,  4000, {.forwards = false, .maxSpeed = 90});
+    chassis.moveToPoint(-4, -39,  4000, {.forwards = false, .maxSpeed = 87});
     pros::delay(1750);
     leftDoinker.set_value(false);
     rightDoinker.set_value(false);
 
     //chassis.moveToPoint(,-34,2000);
-    conv.move(127);
     preRoller.move(127);
-    chassis.swingToHeading(20, lemlib::DriveSide::LEFT, 900, {.maxSpeed = 90});
+    chassis.swingToHeading(20, lemlib::DriveSide::LEFT, 900, {.maxSpeed = 87});
+    conv.move(127);
     pros::delay(200);
-    chassis.swingToHeading(165, lemlib::DriveSide::RIGHT, 1200, {.maxSpeed = 80});
-    chassis.moveToPose(32, -66, 135, 1000);
+    chassis.swingToHeading(165, lemlib::DriveSide::RIGHT, 1200, {.maxSpeed = 95});
+    chassis.moveToPose(36, -66, 145, 1000);
+    pros::delay(800);
+    chassis.moveToPoint(20, -39,  1000, {.forwards = false, .maxSpeed = 95});
+    chassis.turnToHeading(60, 1000);
+    nextState();
+    nextState();
+    mogo.set_value(true);
+    chassis.moveToPoint(41, -25,  1000, {.maxSpeed = 85});
 }
 
 
