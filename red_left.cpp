@@ -228,7 +228,7 @@ void autonomous() {
     chassis.moveToPose(24, -25, 315, 1500, {.maxSpeed = 90});
     pros::delay(250);
 
-    //rings in mid
+    //rings in middle
     chassis.moveToPose(-22, 0, -90, 1600, {.maxSpeed = 110});
     chassis.moveToPose(-38, 0, -90, 1200, {.maxSpeed = 80});
     pros::delay(100);
@@ -236,6 +236,7 @@ void autonomous() {
     pros::delay(300);
     conv.move(0);
     mogo.set_value(false);
+
     preRoller.move(0);
     chassis.moveToPose(-29, 4, 90, 1500, {.maxSpeed = 100});
 
@@ -249,7 +250,6 @@ void autonomous() {
     conv.move(0);
 
     chassis.moveToPoint(-29 , -28, 2000, {.maxSpeed = 40});
-
     pros::delay(200);
     //chassis.turnToHeading(-315, 1500);
     //chassis.moveToPoint(0, -33,  2000, {.forwards = true, .maxSpeed = 30 });

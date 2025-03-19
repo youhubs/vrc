@@ -18,6 +18,12 @@ pros::Optical ring(10);
 pros::Imu imu(9);
 pros::Rotation horizontalRot(5);
 
+double getTrackingWheelDistance() {
+    double wheelDiameter = 2.0;
+    double rotations = horizontalRot.get_position() / 360.0;
+    return rotations * wheelDiameter * M_PI;
+}
+
 const int numStates = 3;
 // Target positions in motor encoder ticks (assuming 1 degree = 5 ticks; adjust as needed)
 int states[numStates] = {0, 230, 1800};
@@ -142,15 +148,14 @@ void initialize() {
             pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
             pros::lcd::print(2, "Heading|Theta: %f", chassis.getPose().theta); // heading
             
-            double horizontalDisplacement = horizontalRot.get_position();
-            pros::lcd::print(3, "Horizontal: %f", horizontalDisplacement);
+            double distance = getTrackingWheelDistance();
+            pros::lcd::print(3, "Tracking Wheel Distance: %f inches", distance);
 
             // delay to save resources
             pros::delay(20);
         }
     });
     
-    // lb.tare_position();
     // Create a task to continuously control the lift motor
     pros::Task liftControlTask([] {
         while (true) {
@@ -223,20 +228,22 @@ void autonomous() {
     chassis.moveToPose(-24, -35, -315, 1500, {.maxSpeed = 90});
     pros::delay(250);
     
-    //rings in mid
+    //rings in middle
     chassis.moveToPose(22, -11, 90, 1600, {.maxSpeed = 110});
-    conv.move(0);
-    preRoller.move(0);
-
     chassis.moveToPose(38, -11, 90, 1200, {.maxSpeed = 80});
     pros::delay(100);
     chassis.turnToHeading(-50, 750);
     pros::delay(300);
     conv.move(0);
+    mogo.set_value(false);
 
     chassis.moveToPose(18, 0, -90, 1500, {.maxSpeed = 100});
     preRoller.move(0);
+    chassis.moveToPose(-29, 4, 90, 1500, {.maxSpeed = 100});
+
+    // Put on the last ring to wall stake
     chassis.turnToHeading(-175, 750);
+    correctPosition(-29, 4);
     chassis.moveToPoint(1, 2, 1000, {.forwards = false});
     pros::delay(500);
     conv.move(127);
@@ -244,8 +251,6 @@ void autonomous() {
     conv.move(0);
 
     chassis.moveToPoint(22, -28, 2000, {.maxSpeed = 120});
-    //chassis.moveToPoint(22, -50, 1500, {.forwards = false, .maxSpeed = 90});
-
     pros::delay(200);
     //chassis.turnToHeading(-315, 1500);
     //chassis.moveToPoint(0, -33,  2000, {.forwards = true, .maxSpeed = 30 });
