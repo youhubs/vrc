@@ -251,8 +251,6 @@ void autonomous() {
 
     chassis.moveToPoint(-29 , -28, 2000, {.maxSpeed = 40});
     pros::delay(200);
-    //chassis.turnToHeading(-315, 1500);
-    //chassis.moveToPoint(0, -33,  2000, {.forwards = true, .maxSpeed = 30 });
 }
 
 
