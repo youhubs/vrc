@@ -12,15 +12,14 @@
 #include <functional>
 
 
-
 //motors
 pros::MotorGroup left_motors({-1, -11, -13}, pros::MotorGearset::blue); // left motors on ports 11, 12, 1
 pros::MotorGroup right_motors({10, 20, 18}, pros::MotorGearset::blue); // right motors on ports 20, 19, 10
-pros::Motor Front_Intake(9, pros::MotorGear::blue);
-pros::Motor Back_Intake(2, pros::MotorGear::blue);
+pros::Motor Front_Intake(9, pros::MotorGearset::blue);
+pros::Motor Back_Intake(2, pros::MotorGearset::blue);
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
 
-//Pnuematics
+//Pneumatics
 pros::adi::Pneumatics Middle_Goal('A',false);
 pros::adi::Pneumatics Wing('C',false);
 pros::adi::Pneumatics Scraper('D',false);
@@ -35,17 +34,13 @@ lemlib::Drivetrain drivetrain(&left_motors, // left motor group
 );
 
 
-
-
-
-
-//Horizonatal -3.75 tracking wheel offset
-//Vertical -2 tracking wheel offest
+//Horizontal -3.75 tracking wheel offset
+//Vertical -2 tracking wheel offset
 pros::Imu imu(4);
 // vertical tracking wheel encoder
 pros::Rotation vertical_encoder(17);
-// vertical tracking wheel
-lemlib::TrackingWheel vertical_tracking_wheel(&vertical_encoder, lemlib::Omniwheel::NEW_2, -0.375);
+// vertical tracking wheel (offset in inches)
+lemlib::TrackingWheel vertical_tracking_wheel(&vertical_encoder, lemlib::Omniwheel::NEW_2, -2.0);
 
 lemlib::OdomSensors sensors(&vertical_tracking_wheel, // vertical tracking wheel 1, set to null
                             nullptr, // vertical tracking wheel 2, set to nullptr as we are using IMEs
@@ -91,7 +86,7 @@ lemlib::Chassis chassis(drivetrain, // drivetrain settings
  * When this callback is fired, it will toggle line 2 of the LCD text between
  * "I was pressed!" and nothing.
  */
- 
+
 void on_center_button() {
     static bool pressed = false;
     pressed = !pressed;
@@ -125,7 +120,6 @@ void initialize() {
             pros::lcd::print(2, "Theta: %.2f", chassis.getPose().theta);
             pros::lcd::print(3, "IMU: %.2f", imu.get_heading());
             pros::lcd::print(5, "V Enc: %d", vertical_encoder.get_position());
-            pros::lcd::print(6, "IMU drift: %f", imu.get_heading());
             pros::delay(50);
             
         }
@@ -153,7 +147,6 @@ void disabled() {}
 void competition_initialize() {
 
 }
-
 
 
 void autonomous() {
@@ -209,6 +202,10 @@ void autonomous() {
     chassis.moveToPoint(-69.5,18,1300,{.forwards=false});
     pros::delay(600);
     Back_Intake.move(-127);
+
+    // Stop all motors at end of autonomous
+    Front_Intake.move(0);
+    Back_Intake.move(0);
 }
 
 /**
