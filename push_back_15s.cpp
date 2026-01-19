@@ -40,7 +40,7 @@ pros::Imu imu(4);
 // vertical tracking wheel encoder
 pros::Rotation vertical_encoder(17);
 // vertical tracking wheel (offset in inches)
-lemlib::TrackingWheel vertical_tracking_wheel(&vertical_encoder, lemlib::Omniwheel::NEW_2, -2.0);
+lemlib::TrackingWheel vertical_tracking_wheel(&vertical_encoder, lemlib::Omniwheel::NEW_2, -0.375);
 
 lemlib::OdomSensors sensors(&vertical_tracking_wheel, // vertical tracking wheel 1, set to null
                             nullptr, // vertical tracking wheel 2, set to nullptr as we are using IMEs
@@ -229,6 +229,15 @@ void opcontrol() {
         // get left y and right x positions
         int turn = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X);
         int forward = controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y);
+
+        // Apply deadband to filter out joystick jitter
+        // V5 joysticks never truly return to zero and may jitter between -5 and 5
+        if (abs(turn) < 5) {
+            turn = 0;
+        }
+        if (abs(forward) < 5) {
+            forward = 0;
+        }
 
         // move the robot
         chassis.arcade(forward, turn);
