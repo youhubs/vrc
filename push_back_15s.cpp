@@ -107,7 +107,19 @@ void initialize() {
     pros::lcd::initialize();
 
     // Calibrate IMU and reset odometry
+    // CRITICAL: Robot must be stationary during calibration
+    // 90% of mysterious failures come from bad calibration
+    pros::lcd::print(4, "Calibrating IMU...");
     chassis.calibrate();
+
+    // Wait for calibration to finish
+    // If the robot is moved/shaken during calibration, it will fail
+    // and cause wild spinning or snake-like driving
+    while (imu.is_calibrating()) {
+        pros::delay(100);
+    }
+    pros::lcd::print(4, "IMU Calibrated!");
+
     chassis.setPose(0, 0, 90);
     vertical_encoder.reset();
     vertical_encoder.set_reversed(true);
