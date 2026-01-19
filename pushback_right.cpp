@@ -11,38 +11,6 @@
 #include "pros/rtos.hpp"
 #include <functional>
 
-// ===== PID TUNING CONSTANTS =====
-// Centralized location for all PID gains - tune here instead of scattered throughout code
-// HOW TO TUNE: See comments near lateral_controller and angular_controller definitions
-
-// Lateral PID (forward/backward movement)
-const double LATERAL_KP = 12.0;    // Proportional gain for driving
-const double LATERAL_KI = 0.0;     // Integral gain (not typically needed)
-const double LATERAL_KD = 47.0;    // Derivative gain for smooth driving
-
-// Angular PID (turning)
-const double ANGULAR_KP = 8.0;     // Proportional gain for turning
-const double ANGULAR_KI = 0.0;     // Integral gain (not typically needed)
-const double ANGULAR_KD = 67.67;   // Derivative gain for smooth turning
-
-// Custom drive straight function PID
-// TUNING GUIDE for driveStraight():
-// Test: Call driveStraight(48, 50) and observe the path
-// - If robot snakes/wiggles → decrease kP or increase kD
-// - If robot drifts off straight → increase kP
-// - If corrections feel jerky → increase kD
-// Start with these values and adjust by ±50% if needed
-const double DRIVE_STRAIGHT_KP = 0.1;   // Heading correction strength (typical range: 0.05-0.3)
-const double DRIVE_STRAIGHT_KD = 0.05;  // Heading correction damping (typical range: 0.02-0.15)
-
-// Custom turn function PID
-const double TURN_KP = 0.5;   // Turn correction strength
-const double TURN_KD = 0.1;   // Turn correction damping
-
-// Driver control constants
-const int JOYSTICK_DEADBAND = 5;  // Joystick values < 5 are treated as zero
-
-
 //motors
 pros::MotorGroup left_motors({-1, -11, -13}, pros::MotorGearset::blue); // left motors on ports 11, 12, 1
 pros::MotorGroup right_motors({10, 20, 18}, pros::MotorGearset::blue); // right motors on ports 20, 19, 10
@@ -91,10 +59,9 @@ lemlib::OdomSensors sensors(&vertical_tracking_wheel, // vertical tracking wheel
 //   - Too slow/sluggish → increase kP
 //   - Oscillates/wiggles → increase kD
 //   - Never reaches target → increase kP
-// NOTE: Values are defined at top of file in PID TUNING CONSTANTS section
-lemlib::ControllerSettings lateral_controller(LATERAL_KP, // proportional gain (kP)
-                                              LATERAL_KI, // integral gain (kI)
-                                              LATERAL_KD, // derivative gain (kD)
+lemlib::ControllerSettings lateral_controller(12.0, // proportional gain (kP)
+                                              0.0, // integral gain (kI)
+                                              47.0, // derivative gain (kD)
                                               0, // anti windup
                                               0, // small error range, in inches
                                               0, // small error range timeout, in milliseconds
@@ -114,10 +81,9 @@ lemlib::ControllerSettings lateral_controller(LATERAL_KP, // proportional gain (
 //   - Turns too slowly → increase kP
 //   - Oscillates back/forth → increase kD
 //   - Never settles at target → increase kD
-// NOTE: Values are defined at top of file in PID TUNING CONSTANTS section
-lemlib::ControllerSettings angular_controller(ANGULAR_KP, // proportional gain (kP)
-                                              ANGULAR_KI, // integral gain (kI)
-                                              ANGULAR_KD, // derivative gain (kD)
+lemlib::ControllerSettings angular_controller(8.0, // proportional gain (kP)
+                                              0.0, // integral gain (kI)
+                                              67.67, // derivative gain (kD)
                                               0, // anti windup
                                               0, // small error range, in degrees
                                               0, // small error range timeout, in milliseconds
@@ -220,15 +186,14 @@ void driveStraight(double dist, double speed, int timeout = 5000) {
     double targetHeading = imu.get_rotation();
 
     // PD gains for heading correction
-    // NOTE: Values defined at top of file in PID TUNING CONSTANTS section
     // kP: Proportional gain - how aggressively to correct drift
     //     Higher = stronger correction but may cause side-to-side wiggling
     //     Lower = gentler correction but slower to fix drift
     // kD: Derivative gain - dampens oscillation for smoother driving
     //     Higher = less wiggling but may be sluggish to correct
     //     Adding kD prevents the "snake wiggle" problem common with P-only control
-    double kP = DRIVE_STRAIGHT_KP;
-    double kD = DRIVE_STRAIGHT_KD;
+    double kP = 0.1;  // Heading correction strength
+    double kD = 0.05; // Heading correction damping
 
     double error = 0;
     double prevError = 0;
@@ -293,8 +258,8 @@ void turnPID(double targetAngle, int timeout = 3000, double tolerance = 1.0) {
     //     Higher = faster turning but may overshoot/oscillate
     // kD: Derivative gain - dampens oscillation by resisting rapid changes
     //     Higher = smoother but slower settling
-    double kP = TURN_KP;
-    double kD = TURN_KD;
+    double kP = 0.5;  // Turn correction strength
+    double kD = 0.1;  // Turn correction damping
 
     double error = 0;
     double prevError = 0;
@@ -459,11 +424,10 @@ void opcontrol() {
 
         // Apply deadband to filter out joystick jitter
         // V5 joysticks never truly return to zero and may jitter between -5 and 5
-        // NOTE: Deadband value defined at top of file in PID TUNING CONSTANTS section
-        if (abs(turn) < JOYSTICK_DEADBAND) {
+        if (abs(turn) < 5) {
             turn = 0;
         }
-        if (abs(forward) < JOYSTICK_DEADBAND) {
+        if (abs(forward) < 5) {
             forward = 0;
         }
 
