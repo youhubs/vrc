@@ -239,6 +239,13 @@ void opcontrol() {
             forward = 0;
         }
 
+        // Apply exponential mapping for better low-speed precision
+        // Linear mapping (50% = 50%) is intuitive but lacks precision
+        // Exponential curve: low speeds become ultra-precise, high speeds unchanged
+        // Formula: Output = (Input^3) / 10000
+        turn = (turn * turn * turn) / 10000;
+        forward = (forward * forward * forward) / 10000;
+
         // move the robot
         chassis.arcade(forward, turn);
 
