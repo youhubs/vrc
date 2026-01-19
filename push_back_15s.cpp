@@ -109,6 +109,15 @@ void initialize() {
     // Calibrate IMU and reset odometry
     // CRITICAL: Robot must be stationary during calibration
     // 90% of mysterious failures come from bad calibration
+
+    // IMU Sensor Reading Methods:
+    // heading() - Compass mode: 0-360°, wraps around (359° → 0°)
+    //             Use for: absolute direction checks (e.g., "facing the goal")
+    // rotation() - Cumulative mode: unbounded, tracks total rotation
+    //              Turn right twice = 720°, turn back left = value decreases
+    //              Use for: PID control and turning logic (avoids wrap-around issues)
+    // TIP: Default to rotation() for motion control to avoid "359° → 1°" problems
+
     pros::lcd::print(4, "Calibrating IMU...");
     chassis.calibrate();
 
