@@ -11,6 +11,37 @@
 #include "pros/rtos.hpp"
 #include <functional>
 
+// ===== PID TUNING CONSTANTS =====
+// Centralized location for all PID gains - tune here instead of scattered throughout code
+// HOW TO TUNE: See comments near lateral_controller and angular_controller definitions
+
+// Lateral PID (forward/backward movement)
+const double LATERAL_KP = 12.0;    // Proportional gain for driving
+const double LATERAL_KI = 0.0;     // Integral gain (not typically needed)
+const double LATERAL_KD = 47.0;    // Derivative gain for smooth driving
+
+// Angular PID (turning)
+const double ANGULAR_KP = 8.0;     // Proportional gain for turning
+const double ANGULAR_KI = 0.0;     // Integral gain (not typically needed)
+const double ANGULAR_KD = 67.67;   // Derivative gain for smooth turning
+
+// Custom drive straight function PID
+// TUNING GUIDE for driveStraight():
+// Test: Call driveStraight(48, 50) and observe the path
+// - If robot snakes/wiggles → decrease kP or increase kD
+// - If robot drifts off straight → increase kP
+// - If corrections feel jerky → increase kD
+// Start with these values and adjust by ±50% if needed
+const double DRIVE_STRAIGHT_KP = 0.1;   // Heading correction strength (typical range: 0.05-0.3)
+const double DRIVE_STRAIGHT_KD = 0.05;  // Heading correction damping (typical range: 0.02-0.15)
+
+// Custom turn function PID
+const double TURN_KP = 0.5;   // Turn correction strength
+const double TURN_KD = 0.1;   // Turn correction damping
+
+// Driver control constants
+const int JOYSTICK_DEADBAND = 5;  // Joystick values < 5 are treated as zero
+
 
 //motors
 pros::MotorGroup left_motors({-1, -11, -13}, pros::MotorGearset::blue); // left motors on ports 11, 12, 1
@@ -49,10 +80,21 @@ lemlib::OdomSensors sensors(&vertical_tracking_wheel, // vertical tracking wheel
                             &imu // inertial sensor
 );
 
-// lateral PID controller
-lemlib::ControllerSettings lateral_controller(12, // proportional gain (kP) 13
-                                              0, // integral gain (kI)
-                                              47, // derivative gain (kD) 60.8
+// lateral PID controller (forward/backward movement)
+// HOW TO TUNE kP and kD:
+// 1. Set kD=0, start with kP=1, test driving 48 inches
+// 2. Increase kP until robot oscillates (wiggles left/right)
+// 3. Reduce kP to 60% of oscillation point
+// 4. Set kD = kP/10, gradually increase until smooth
+// Symptoms:
+//   - Overshoots target → increase kD or decrease kP
+//   - Too slow/sluggish → increase kP
+//   - Oscillates/wiggles → increase kD
+//   - Never reaches target → increase kP
+// NOTE: Values are defined at top of file in PID TUNING CONSTANTS section
+lemlib::ControllerSettings lateral_controller(LATERAL_KP, // proportional gain (kP)
+                                              LATERAL_KI, // integral gain (kI)
+                                              LATERAL_KD, // derivative gain (kD)
                                               0, // anti windup
                                               0, // small error range, in inches
                                               0, // small error range timeout, in milliseconds
@@ -61,10 +103,21 @@ lemlib::ControllerSettings lateral_controller(12, // proportional gain (kP) 13
                                               0 // maximum acceleration (slew)
 );
 
-// angular PID controller
-lemlib::ControllerSettings angular_controller(8, // proportional gain (kP)8
-                                              0, // integral gain (kI)
-                                              67.67, // derivative gain (kD)67
+// angular PID controller (turning)
+// HOW TO TUNE kP and kD:
+// 1. Set kD=0, start with kP=1, test turning 90°
+// 2. Increase kP until robot oscillates back/forth
+// 3. Reduce kP to 60% of oscillation point
+// 4. Set kD = kP/10, gradually increase until smooth
+// Symptoms:
+//   - Overshoots angle → increase kD or decrease kP
+//   - Turns too slowly → increase kP
+//   - Oscillates back/forth → increase kD
+//   - Never settles at target → increase kD
+// NOTE: Values are defined at top of file in PID TUNING CONSTANTS section
+lemlib::ControllerSettings angular_controller(ANGULAR_KP, // proportional gain (kP)
+                                              ANGULAR_KI, // integral gain (kI)
+                                              ANGULAR_KD, // derivative gain (kD)
                                               0, // anti windup
                                               0, // small error range, in degrees
                                               0, // small error range timeout, in milliseconds
@@ -145,6 +198,159 @@ void initialize() {
             
         }
     });
+}
+
+/**
+ * Drive straight using gyro correction
+ * Uses rotation() to avoid wrap-around issues with heading()
+ *
+ * @param dist Target distance in inches
+ * @param speed Base speed (0-100 percent)
+ * @param timeout Maximum time in milliseconds to prevent infinite loops
+ */
+void driveStraight(double dist, double speed, int timeout = 5000) {
+    // Reset motor encoders
+    left_motors.set_encoder_units(pros::E_MOTOR_ENCODER_DEGREES);
+    right_motors.set_encoder_units(pros::E_MOTOR_ENCODER_DEGREES);
+    left_motors.tare_position();
+    right_motors.tare_position();
+
+    // Lock in target heading using rotation() (cumulative, avoids wrap-around)
+    // Using rotation() instead of heading() prevents "359° → 1°" problems
+    double targetHeading = imu.get_rotation();
+
+    // PD gains for heading correction
+    // NOTE: Values defined at top of file in PID TUNING CONSTANTS section
+    // kP: Proportional gain - how aggressively to correct drift
+    //     Higher = stronger correction but may cause side-to-side wiggling
+    //     Lower = gentler correction but slower to fix drift
+    // kD: Derivative gain - dampens oscillation for smoother driving
+    //     Higher = less wiggling but may be sluggish to correct
+    //     Adding kD prevents the "snake wiggle" problem common with P-only control
+    double kP = DRIVE_STRAIGHT_KP;
+    double kD = DRIVE_STRAIGHT_KD;
+
+    double error = 0;
+    double prevError = 0;
+
+    // Convert distance from inches to encoder degrees
+    // Wheel diameter affects this conversion
+    double wheelCircumference = 2.75 * M_PI; // 2.75" wheel diameter
+    double targetDegrees = (dist / wheelCircumference) * 360.0;
+
+    // Start timer for timeout protection
+    uint32_t startTime = pros::millis();
+
+    // Loop until distance reached or timeout
+    while (fabs(left_motors.get_position()) < fabs(targetDegrees)) {
+        // Timeout check to prevent infinite loops
+        if (pros::millis() - startTime > timeout) {
+            break;
+        }
+
+        // --- Core PD Correction Logic ---
+        // 1. How much have we drifted from target heading?
+        double currentHeading = imu.get_rotation();
+        error = targetHeading - currentHeading;
+
+        // 2. Calculate correction strength using PD control
+        // P term: proportional to current drift
+        // D term: resists rapid changes, prevents wiggling/oscillation
+        // Positive error (drifted left) → positive correction
+        // Negative error (drifted right) → negative correction
+        double derivative = error - prevError;
+        double correction = error * kP + derivative * kD;
+
+        // 3. Apply correction to motors
+        // If drifted left (positive error): slow left motor, speed up right motor
+        // If drifted right (negative error): speed up left motor, slow right motor
+        left_motors.move(speed - correction);
+        right_motors.move(speed + correction);
+
+        prevError = error; // Store error for next derivative calculation
+
+        // Small delay to prevent CPU overload
+        pros::delay(20);
+    }
+
+    // Stop motors when target reached
+    left_motors.brake();
+    right_motors.brake();
+}
+
+/**
+ * Turn to target angle using PD control
+ * Uses rotation() for cumulative angle tracking (avoids wrap-around)
+ *
+ * @param targetAngle Target angle in degrees (can be >360 or negative)
+ * @param timeout Maximum time in milliseconds to prevent infinite loops
+ * @param tolerance Acceptable error in degrees (default 1.0°)
+ */
+void turnPID(double targetAngle, int timeout = 3000, double tolerance = 1.0) {
+    // PD gains
+    // NOTE: Values defined at top of file in PID TUNING CONSTANTS section
+    // kP: Proportional gain - how aggressively to correct error
+    //     Higher = faster turning but may overshoot/oscillate
+    // kD: Derivative gain - dampens oscillation by resisting rapid changes
+    //     Higher = smoother but slower settling
+    double kP = TURN_KP;
+    double kD = TURN_KD;
+
+    double error = 0;
+    double prevError = 0;
+
+    // Start timer for timeout protection
+    uint32_t startTime = pros::millis();
+
+    // Settling time tracking - ensures robot is stable at target
+    int settledCount = 0;
+    const int requiredSettledCycles = 3; // Must be within tolerance for 3 cycles
+
+    while (true) {
+        // Timeout check to prevent infinite loops
+        if (pros::millis() - startTime > timeout) {
+            break;
+        }
+
+        // Use rotation() instead of heading() to avoid wrap-around issues
+        // This allows turning to angles like 720° or -180°
+        double currentAngle = imu.get_rotation();
+        error = targetAngle - currentAngle;
+
+        // Exit condition: error is within tolerance AND robot has settled
+        if (fabs(error) < tolerance) {
+            settledCount++;
+            if (settledCount >= requiredSettledCycles) {
+                break; // Successfully reached target
+            }
+        } else {
+            settledCount = 0; // Reset if we drift outside tolerance
+        }
+
+        // --- PD Control Calculation ---
+        // P term: proportional to current error
+        // D term: proportional to rate of change (prevents overshoot)
+        double derivative = error - prevError;
+        double speed = error * kP + derivative * kD;
+
+        // Clamp speed to prevent excessive motor strain
+        // Maximum turn speed: 80% to maintain control
+        if (speed > 80) speed = 80;
+        if (speed < -80) speed = -80;
+
+        // In-place turning: left and right motors spin opposite directions
+        // Positive error (need to turn right): left forward, right backward
+        // Negative error (need to turn left): left backward, right forward
+        left_motors.move(speed);
+        right_motors.move(-speed);
+
+        prevError = error;
+        pros::delay(20); // Small delay to prevent CPU overload
+    }
+
+    // Stop motors when target reached or timeout
+    left_motors.brake();
+    right_motors.brake();
 }
 
 void disabled() {}
@@ -253,10 +459,11 @@ void opcontrol() {
 
         // Apply deadband to filter out joystick jitter
         // V5 joysticks never truly return to zero and may jitter between -5 and 5
-        if (abs(turn) < 5) {
+        // NOTE: Deadband value defined at top of file in PID TUNING CONSTANTS section
+        if (abs(turn) < JOYSTICK_DEADBAND) {
             turn = 0;
         }
-        if (abs(forward) < 5) {
+        if (abs(forward) < JOYSTICK_DEADBAND) {
             forward = 0;
         }
 
